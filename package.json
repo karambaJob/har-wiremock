@@ -1,0 +1,21 @@
+{
+  "name": "har-wiremock",
+  "version": "1.0.0",
+  "description": "Convert HAR files from Chrome to WireMock stub mappings",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "convert": "node index.js"
+  },
+  "keywords": [
+    "har",
+    "wiremock",
+    "mocking",
+    "http"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}
+

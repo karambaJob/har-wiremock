@@ -1,0 +1,6 @@
+node_modules/
+wiremock-mappings/
+*.har
+.DS_Store
+*.log
+
