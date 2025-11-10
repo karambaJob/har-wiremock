@@ -3,4 +3,4 @@ wiremock-mappings/
 *.har
 .DS_Store
 *.log
-
+har/

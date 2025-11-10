@@ -53,24 +53,22 @@ function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings') {
         },
         response: {
           status: response.status || 200,
-          headers: convertHeaders(response.headers || []),
+          headers: convertHeaders(response.headers || [], false),
           body: extractBody(response),
         },
       };
 
-      // Добавляем query параметры, если они есть
+      // Добавляем query параметры, если они есть (с фильтрацией токенов)
       if (request.queryString && request.queryString.length > 0) {
-        stubMapping.request.queryParameters = {};
-        request.queryString.forEach(param => {
-          stubMapping.request.queryParameters[param.name] = {
-            equalTo: param.value
-          };
-        });
+        const filteredQueryParams = filterQueryParameters(request.queryString);
+        if (Object.keys(filteredQueryParams).length > 0) {
+          stubMapping.request.queryParameters = filteredQueryParams;
+        }
       }
 
-      // Добавляем заголовки запроса, если нужно
+      // Добавляем заголовки запроса, если нужно (с фильтрацией)
       if (request.headers && request.headers.length > 0) {
-        const requestHeaders = convertHeaders(request.headers);
+        const requestHeaders = convertHeaders(request.headers, true);
         if (Object.keys(requestHeaders).length > 0) {
           stubMapping.request.headers = requestHeaders;
         }
@@ -97,17 +95,128 @@ function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings') {
 }
 
 /**
- * Конвертирует массив заголовков HAR в объект
+ * Список заголовков, которые нужно отфильтровать (специфичны для окружения)
  */
-function convertHeaders(headers) {
+const FILTERED_HEADERS = [
+  // Авторизация и аутентификация
+  'authorization',
+  'cookie',
+  'x-auth-token',
+  'x-api-key',
+  'x-session-token',
+  'x-csrf-token',
+  'x-requested-with',
+  'x-access-token',
+  'x-refresh-token',
+  
+  // Заголовки хоста и окружения
+  'host',
+  'origin',
+  'referer',
+  'x-forwarded-host',
+  'x-forwarded-for',
+  'x-real-ip',
+  'x-forwarded-proto',
+  'x-original-host',
+  
+  // Системные заголовки
+  'content-encoding',
+  'content-length',
+  'transfer-encoding',
+  'connection',
+  'keep-alive',
+  'accept-encoding',
+  'upgrade',
+  
+  // Заголовки браузера (опционально, можно оставить если нужны)
+  // 'user-agent',
+  // 'accept-language',
+  // 'accept-charset',
+  
+  // Другие специфичные заголовки
+  'if-modified-since',
+  'if-none-match',
+  'cache-control',
+  'pragma',
+];
+
+/**
+ * Конвертирует массив заголовков HAR в объект с фильтрацией
+ * @param {Array} headers - Массив заголовков из HAR
+ * @param {boolean} isRequest - true для заголовков запроса, false для ответа
+ */
+function convertHeaders(headers, isRequest = true) {
   const result = {};
   headers.forEach(header => {
-    // Пропускаем некоторые системные заголовки
-    const skipHeaders = ['content-encoding', 'content-length', 'transfer-encoding'];
-    if (!skipHeaders.includes(header.name.toLowerCase())) {
-      result[header.name] = header.value;
+    const headerName = header.name.toLowerCase();
+    
+    // Для запросов фильтруем больше заголовков
+    if (isRequest && FILTERED_HEADERS.includes(headerName)) {
+      return;
     }
+    
+    // Для ответов фильтруем только системные
+    if (!isRequest) {
+      const responseFilteredHeaders = [
+        'content-encoding',
+        'content-length',
+        'transfer-encoding',
+        'connection',
+        'date',
+        'server',
+        'x-powered-by',
+        'x-request-id',
+        'x-trace-id',
+      ];
+      if (responseFilteredHeaders.includes(headerName)) {
+        return;
+      }
+    }
+    
+    result[header.name] = header.value;
   });
+  return result;
+}
+
+/**
+ * Фильтрует query параметры, убирая токены и ключи API
+ * @param {Array} queryParams - Массив query параметров из HAR
+ */
+function filterQueryParameters(queryParams) {
+  const result = {};
+  const filteredParamNames = [
+    'token',
+    'api_key',
+    'api-key',
+    'apikey',
+    'auth',
+    'auth_token',
+    'session',
+    'sessionid',
+    'csrf',
+    'csrf_token',
+    'access_token',
+    'refresh_token',
+  ];
+  
+  queryParams.forEach(param => {
+    const paramName = param.name.toLowerCase();
+    
+    // Пропускаем параметры, которые выглядят как токены/ключи
+    if (filteredParamNames.includes(paramName)) {
+      return;
+    }
+    
+    // Пропускаем параметры, которые содержат "token" или "key" в названии
+    if (paramName.includes('token') || paramName.includes('key') || paramName.includes('secret')) {
+      return;
+    }
+    
+    result[param.name] = {
+      equalTo: param.value
+    };
+  });
+  
   return result;
 }
 

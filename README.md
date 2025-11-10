@@ -78,5 +78,23 @@ node index.js requests.har ./mocks
 - Автоматически извлекает метод, URL, заголовки, query параметры и тело ответа
 - Поддерживает JSON и текстовые ответы
 - Генерирует уникальные имена файлов для каждого запроса
-- Пропускает системные заголовки (content-encoding, content-length, transfer-encoding)
+- **Автоматическая фильтрация окружения-специфичных данных** для использования на разных серверах
+
+## Фильтрация данных
+
+Скрипт автоматически фильтрует следующие параметры, специфичные для окружения, где был записан HAR:
+
+### Отфильтрованные заголовки запроса:
+- **Авторизация**: `Authorization`, `Cookie`, `X-Auth-Token`, `X-API-Key`, `X-Session-Token`, `X-CSRF-Token` и другие токены
+- **Хост и окружение**: `Host`, `Origin`, `Referer`, `X-Forwarded-Host`, `X-Forwarded-For`, `X-Real-IP`
+- **Системные**: `Content-Encoding`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Accept-Encoding`
+- **Кэш**: `Cache-Control`, `If-Modified-Since`, `If-None-Match`, `Pragma`
+
+### Отфильтрованные query параметры:
+- Параметры, содержащие токены и ключи: `token`, `api_key`, `api-key`, `auth`, `session`, `csrf`, `access_token`, `refresh_token` и любые параметры с названиями, содержащими `token`, `key` или `secret`
+
+### Отфильтрованные заголовки ответа:
+- Системные заголовки: `Content-Encoding`, `Content-Length`, `Transfer-Encoding`, `Connection`, `Date`, `Server`, `X-Powered-By`, `X-Request-Id`, `X-Trace-Id`
+
+Это позволяет использовать созданные моки на любом тестовом сервере без привязки к конкретному окружению, где был записан HAR файл.
 
