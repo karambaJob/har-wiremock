@@ -9,8 +9,9 @@ const __dirname = path.dirname(__filename);
  * Конвертирует HAR файл в WireMock stub mappings
  * @param {string} harFilePath - Путь к HAR файлу
  * @param {string} outputDir - Директория для сохранения моков
+ * @param {Set<number>} selectedIndices - Множество индексов запросов для конвертации (опционально)
  */
-function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings') {
+export function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings', selectedIndices = null) {
   try {
     // Читаем HAR файл
     const harContent = fs.readFileSync(harFilePath, 'utf8');
@@ -26,18 +27,27 @@ function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings') {
     
     if (entries.length === 0) {
       console.log('⚠️  В HAR файле не найдено запросов');
-      return;
+      return { success: false, message: 'В HAR файле не найдено запросов' };
     }
 
     console.log(`📦 Найдено ${entries.length} запросов в HAR файле`);
 
+    let convertedCount = 0;
+    let skippedCount = 0;
+
     // Конвертируем каждый запрос в WireMock stub
     entries.forEach((entry, index) => {
+      // Если указаны выбранные индексы, пропускаем невыбранные
+      if (selectedIndices !== null && !selectedIndices.has(index)) {
+        skippedCount++;
+        return;
+      }
       const request = entry.request;
       const response = entry.response;
 
       // Пропускаем запросы без URL
       if (!request?.url) {
+        skippedCount++;
         return;
       }
 
@@ -83,15 +93,75 @@ function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings') {
       const filePath = path.join(outputDir, fileName);
       fs.writeFileSync(filePath, JSON.stringify(stubMapping, null, 2), 'utf8');
       
+      convertedCount++;
       console.log(`✅ Создан мок: ${fileName}`);
     });
 
     console.log(`\n✨ Конвертация завершена! Моки сохранены в: ${outputDir}`);
+    console.log(`📊 Конвертировано: ${convertedCount}, Пропущено: ${skippedCount}`);
+    
+    return { 
+      success: true, 
+      convertedCount, 
+      skippedCount,
+      outputDir 
+    };
     
   } catch (error) {
     console.error('❌ Ошибка при конвертации:', error.message);
-    process.exit(1);
+    if (typeof process !== 'undefined' && process.exit) {
+      process.exit(1);
+    }
+    throw error;
   }
+}
+
+/**
+ * Парсит HAR файл и возвращает список запросов
+ * @param {string|Object} harData - Путь к HAR файлу или объект HAR данных
+ */
+export function parseHarFile(harData) {
+  let harContent;
+  
+  if (typeof harData === 'string') {
+    // Если это путь к файлу
+    harContent = fs.readFileSync(harData, 'utf8');
+    harData = JSON.parse(harContent);
+  }
+  
+  const entries = harData.log?.entries || [];
+  
+  return entries.map((entry, index) => {
+    const request = entry.request;
+    const response = entry.response;
+    
+    if (!request?.url) {
+      return null;
+    }
+    
+    try {
+      const url = new URL(request.url);
+      return {
+        index,
+        method: request.method || 'GET',
+        url: request.url,
+        path: url.pathname + url.search,
+        status: response?.status || 0,
+        mimeType: response?.content?.mimeType || '',
+        size: response?.content?.size || 0,
+      };
+    } catch (e) {
+      return {
+        index,
+        method: request.method || 'GET',
+        url: request.url,
+        path: request.url,
+        status: response?.status || 0,
+        mimeType: response?.content?.mimeType || '',
+        size: response?.content?.size || 0,
+      };
+    }
+  }).filter(entry => entry !== null);
 }
 
 /**
@@ -243,7 +313,7 @@ function extractBody(response) {
 }
 
 /**
- * Основная функция
+ * Основная функция (для CLI использования)
  */
 function main() {
   const args = process.argv.slice(2);
@@ -273,5 +343,9 @@ function main() {
   convertHarToWireMock(harFilePath, outputDir);
 }
 
-main();
+// Запускаем main только если файл запущен напрямую (не импортирован)
+// Проверяем, что файл запущен как скрипт, а не импортирован
+if (process.argv[1] && (process.argv[1].endsWith('index.js') || process.argv[1].includes('index.js'))) {
+  main();
+}
 

@@ -4,3 +4,6 @@ wiremock-mappings/
 .DS_Store
 *.log
 har/
+uploads/
+frontend/node_modules/
+frontend/dist/

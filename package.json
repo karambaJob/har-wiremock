@@ -6,7 +6,11 @@
   "type": "module",
   "scripts": {
     "start": "node index.js",
-    "convert": "node index.js"
+    "convert": "node index.js",
+    "server": "node server.js",
+    "dev": "node server.js",
+    "frontend": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build"
   },
   "keywords": [
     "har",
@@ -16,6 +20,17 @@
   ],
   "author": "",
   "license": "MIT",
-  "dependencies": {}
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karambaJob/har-wiremock.git"
+  },
+  "bugs": {
+    "url": "https://github.com/karambaJob/har-wiremock/issues"
+  },
+  "homepage": "https://github.com/karambaJob/har-wiremock#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "multer": "^2.0.2"
+  }
 }
-
