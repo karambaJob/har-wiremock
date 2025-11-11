@@ -44,6 +44,27 @@ body {
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
 }
 
+.mode-tabs {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.tab-btn {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: 2px solid #e0e0e0;
+  background: #f9f9f9;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.tab-btn.active {
+  border-color: #667eea;
+  background: #eef0ff;
+  color: #333;
+}
+
 .upload-section {
   display: flex;
   gap: 15px;
@@ -186,6 +207,22 @@ body {
   font-weight: 600;
   color: #667eea;
   font-size: 1rem;
+}
+
+.variants-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f5f5f5;
+  padding: 6px 10px;
+  border-radius: 6px;
+}
+
+.variants-input input {
+  width: 80px;
+  padding: 6px 8px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
 }
 
 .requests-list {
@@ -417,6 +454,59 @@ body {
   text-align: center;
   padding-top: 20px;
   border-top: 2px solid #e0e0e0;
+}
+
+.custom-rules-section {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rules-textarea {
+  width: 100%;
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.9rem;
+}
+
+.rules-help {
+  margin-top: 10px;
+  background: #f9fafc;
+  border: 1px solid #e6e8f0;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.rules-help-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #333;
+}
+
+.rules-help-text {
+  color: #555;
+  margin-bottom: 8px;
+}
+
+.rules-help-examples {
+  color: #333;
+}
+
+.rules-code {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 6px;
+  padding: 10px;
+  overflow: auto;
+  margin: 8px 0;
+}
+
+.rules-list {
+  margin-left: 18px;
+  color: #555;
 }
 
 /* Scrollbar styling */
