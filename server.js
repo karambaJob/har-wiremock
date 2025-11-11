@@ -58,7 +58,7 @@ app.post('/api/upload', upload.single('harFile'), (req, res) => {
 // API: Конвертация выбранных запросов
 app.post('/api/convert', async (req, res) => {
   try {
-    const { fileId, selectedIndices, outputDir } = req.body;
+    const { fileId, selectedIndices, selectedOptions, outputDir } = req.body;
     
     if (!fileId) {
       return res.status(400).json({ error: 'fileId обязателен' });
@@ -77,7 +77,24 @@ app.post('/api/convert', async (req, res) => {
     const selectedSet = new Set(selectedIndices.map(i => parseInt(i)));
     const outputDirectory = outputDir || './wiremock-mappings';
     
-    const result = convertHarToWireMock(filePath, outputDirectory, selectedSet);
+    // Преобразуем selectedOptions из объекта с массивами в объект с Set
+    let processedOptions = null;
+    if (selectedOptions) {
+      processedOptions = {};
+      Object.keys(selectedOptions).forEach(indexStr => {
+        const index = parseInt(indexStr);
+        processedOptions[index] = {
+          headers: selectedOptions[indexStr].headers 
+            ? new Set(selectedOptions[indexStr].headers) 
+            : null,
+          queryParams: selectedOptions[indexStr].queryParams 
+            ? new Set(selectedOptions[indexStr].queryParams) 
+            : null
+        };
+      });
+    }
+    
+    const result = convertHarToWireMock(filePath, outputDirectory, selectedSet, processedOptions);
     
     res.json({
       success: true,

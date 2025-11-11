@@ -10,8 +10,9 @@ const __dirname = path.dirname(__filename);
  * @param {string} harFilePath - Путь к HAR файлу
  * @param {string} outputDir - Директория для сохранения моков
  * @param {Set<number>} selectedIndices - Множество индексов запросов для конвертации (опционально)
+ * @param {Object} selectedOptions - Объект с выбранными заголовками и параметрами для каждого запроса { index: { headers: Set, queryParams: Set } }
  */
-export function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings', selectedIndices = null) {
+export function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappings', selectedIndices = null, selectedOptions = null) {
   try {
     // Читаем HAR файл
     const harContent = fs.readFileSync(harFilePath, 'utf8');
@@ -68,17 +69,47 @@ export function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappin
         },
       };
 
-      // Добавляем query параметры, если они есть (с фильтрацией токенов)
+      // Добавляем query параметры
       if (request.queryString && request.queryString.length > 0) {
-        const filteredQueryParams = filterQueryParameters(request.queryString);
-        if (Object.keys(filteredQueryParams).length > 0) {
-          stubMapping.request.queryParameters = filteredQueryParams;
+        let queryParams = {};
+        
+        if (selectedOptions && selectedOptions[index] && selectedOptions[index].queryParams) {
+          // Используем выбранные параметры
+          const selectedParams = selectedOptions[index].queryParams;
+          request.queryString.forEach(param => {
+            if (selectedParams.has(param.name)) {
+              queryParams[param.name] = {
+                equalTo: param.value
+              };
+            }
+          });
+        } else {
+          // Используем автоматическую фильтрацию (старое поведение)
+          queryParams = filterQueryParameters(request.queryString);
+        }
+        
+        if (Object.keys(queryParams).length > 0) {
+          stubMapping.request.queryParameters = queryParams;
         }
       }
 
-      // Добавляем заголовки запроса, если нужно (с фильтрацией)
+      // Добавляем заголовки запроса
       if (request.headers && request.headers.length > 0) {
-        const requestHeaders = convertHeaders(request.headers, true);
+        let requestHeaders = {};
+        
+        if (selectedOptions && selectedOptions[index] && selectedOptions[index].headers) {
+          // Используем выбранные заголовки
+          const selectedHeaders = selectedOptions[index].headers;
+          request.headers.forEach(header => {
+            if (selectedHeaders.has(header.name)) {
+              requestHeaders[header.name] = header.value;
+            }
+          });
+        } else {
+          // Используем автоматическую фильтрацию (старое поведение)
+          requestHeaders = convertHeaders(request.headers, true);
+        }
+        
         if (Object.keys(requestHeaders).length > 0) {
           stubMapping.request.headers = requestHeaders;
         }
@@ -117,54 +148,6 @@ export function convertHarToWireMock(harFilePath, outputDir = './wiremock-mappin
 }
 
 /**
- * Парсит HAR файл и возвращает список запросов
- * @param {string|Object} harData - Путь к HAR файлу или объект HAR данных
- */
-export function parseHarFile(harData) {
-  let harContent;
-  
-  if (typeof harData === 'string') {
-    // Если это путь к файлу
-    harContent = fs.readFileSync(harData, 'utf8');
-    harData = JSON.parse(harContent);
-  }
-  
-  const entries = harData.log?.entries || [];
-  
-  return entries.map((entry, index) => {
-    const request = entry.request;
-    const response = entry.response;
-    
-    if (!request?.url) {
-      return null;
-    }
-    
-    try {
-      const url = new URL(request.url);
-      return {
-        index,
-        method: request.method || 'GET',
-        url: request.url,
-        path: url.pathname + url.search,
-        status: response?.status || 0,
-        mimeType: response?.content?.mimeType || '',
-        size: response?.content?.size || 0,
-      };
-    } catch (e) {
-      return {
-        index,
-        method: request.method || 'GET',
-        url: request.url,
-        path: request.url,
-        status: response?.status || 0,
-        mimeType: response?.content?.mimeType || '',
-        size: response?.content?.size || 0,
-      };
-    }
-  }).filter(entry => entry !== null);
-}
-
-/**
  * Список заголовков, которые нужно отфильтровать (специфичны для окружения)
  */
 const FILTERED_HEADERS = [
@@ -198,17 +181,104 @@ const FILTERED_HEADERS = [
   'accept-encoding',
   'upgrade',
   
-  // Заголовки браузера (опционально, можно оставить если нужны)
-  // 'user-agent',
-  // 'accept-language',
-  // 'accept-charset',
-  
   // Другие специфичные заголовки
   'if-modified-since',
   'if-none-match',
   'cache-control',
   'pragma',
 ];
+
+/**
+ * Проверяет, должен ли query параметр быть отфильтрован
+ */
+function isQueryParamFiltered(paramName) {
+  const filteredParamNames = [
+    'token',
+    'api_key',
+    'api-key',
+    'apikey',
+    'auth',
+    'auth_token',
+    'session',
+    'sessionid',
+    'csrf',
+    'csrf_token',
+    'access_token',
+    'refresh_token',
+  ];
+  
+  const lowerName = paramName.toLowerCase();
+  return filteredParamNames.includes(lowerName) ||
+         lowerName.includes('token') ||
+         lowerName.includes('key') ||
+         lowerName.includes('secret');
+}
+
+/**
+ * Парсит HAR файл и возвращает список запросов с детальной информацией
+ * @param {string|Object} harData - Путь к HAR файлу или объект HAR данных
+ */
+export function parseHarFile(harData) {
+  let harContent;
+  
+  if (typeof harData === 'string') {
+    // Если это путь к файлу
+    harContent = fs.readFileSync(harData, 'utf8');
+    harData = JSON.parse(harContent);
+  }
+  
+  const entries = harData.log?.entries || [];
+  
+  return entries.map((entry, index) => {
+    const request = entry.request;
+    const response = entry.response;
+    
+    if (!request?.url) {
+      return null;
+    }
+    
+    // Извлекаем все заголовки запроса
+    const requestHeaders = (request.headers || []).map(header => ({
+      name: header.name,
+      value: header.value,
+      isFiltered: FILTERED_HEADERS.includes(header.name.toLowerCase())
+    }));
+    
+    // Извлекаем все query параметры
+    const queryParams = (request.queryString || []).map(param => ({
+      name: param.name,
+      value: param.value,
+      isFiltered: isQueryParamFiltered(param.name)
+    }));
+    
+    try {
+      const url = new URL(request.url);
+      return {
+        index,
+        method: request.method || 'GET',
+        url: request.url,
+        path: url.pathname + url.search,
+        status: response?.status || 0,
+        mimeType: response?.content?.mimeType || '',
+        size: response?.content?.size || 0,
+        requestHeaders,
+        queryParams,
+      };
+    } catch (e) {
+      return {
+        index,
+        method: request.method || 'GET',
+        url: request.url,
+        path: request.url,
+        status: response?.status || 0,
+        mimeType: response?.content?.mimeType || '',
+        size: response?.content?.size || 0,
+        requestHeaders,
+        queryParams,
+      };
+    }
+  }).filter(entry => entry !== null);
+}
 
 /**
  * Конвертирует массив заголовков HAR в объект с фильтрацией
