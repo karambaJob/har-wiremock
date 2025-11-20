@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import './App.css'
+import DtoVisualization from './components/DtoVisualization'
 
 function App() {
   // режим: har | swagger
@@ -27,6 +28,8 @@ function App() {
   const [variantsPerEndpoint, setVariantsPerEndpoint] = useState(1)
   const [customRulesText, setCustomRulesText] = useState('[]') // JSON textarea
   const [swaggerGenerating, setSwaggerGenerating] = useState(false)
+  const [dtoData, setDtoData] = useState(null)
+  const [showDtoVisualization, setShowDtoVisualization] = useState(false)
 
   const handleFileChange = (e) => {
     const selectedFile = e.target.files[0]
@@ -142,6 +145,37 @@ function App() {
       }
     } catch (err) {
       setError('Ошибка при загрузке Swagger: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleAnalyzeDto = async () => {
+    if (!swaggerFileId) {
+      setError('Пожалуйста, сначала загрузите Swagger файл')
+      return
+    }
+    
+    setLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/analyze-swagger-dto', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fileId: swaggerFileId })
+      })
+      
+      const data = await response.json()
+      
+      if (data.success) {
+        setDtoData(data)
+        setShowDtoVisualization(true)
+      } else {
+        setError(data.error || 'Ошибка при анализе DTO')
+      }
+    } catch (err) {
+      setError('Ошибка при анализе DTO: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -524,6 +558,14 @@ function App() {
           >
             {loading ? 'Загрузка...' : 'Загрузить эндпоинты'}
           </button>
+          <button
+            onClick={handleAnalyzeDto}
+            disabled={!swaggerFileId || loading}
+            className="btn btn-secondary"
+            style={{ marginLeft: '10px' }}
+          >
+            {loading ? 'Анализ...' : 'Анализ DTO'}
+          </button>
         </div>
         )}
 
@@ -881,6 +923,21 @@ function App() {
                 {swaggerGenerating ? 'Генерация...' : `Сгенерировать (${epSelected.size})`}
               </button>
             </div>
+          </div>
+        )}
+        
+        {showDtoVisualization && dtoData && (
+          <div className="dto-visualization-section">
+            <div className="dto-visualization-header">
+              <h2>Анализ DTO и связей</h2>
+              <button
+                className="btn btn-secondary"
+                onClick={() => setShowDtoVisualization(false)}
+              >
+                Закрыть
+              </button>
+            </div>
+            <DtoVisualization dtoData={dtoData} />
           </div>
         )}
       </main>

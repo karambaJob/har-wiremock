@@ -5,7 +5,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import { convertHarToWireMock, parseHarFile } from './index.js';
 import fs from 'fs';
-import { listEndpoints, convertOpenApiToWireMock } from './swagger.js';
+import { listEndpoints, convertOpenApiToWireMock, analyzeDtoUsage } from './swagger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -90,6 +90,28 @@ app.post('/api/generate-from-swagger', async (req, res) => {
     res.json({ success: true, ...result });
   } catch (error) {
     console.error('Ошибка при генерации из swagger:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// API: Анализ DTO из Swagger файла
+app.post('/api/analyze-swagger-dto', (req, res) => {
+  try {
+    const { fileId } = req.body;
+
+    if (!fileId) {
+      return res.status(400).json({ error: 'fileId обязателен' });
+    }
+
+    const filePath = path.join('uploads', fileId);
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({ error: 'Файл не найден' });
+    }
+
+    const result = analyzeDtoUsage(filePath);
+    res.json({ success: true, ...result });
+  } catch (error) {
+    console.error('Ошибка при анализе DTO:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -206,4 +228,3 @@ app.get('/api/mappings', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 Сервер запущен на http://localhost:${PORT}`);
 });
-

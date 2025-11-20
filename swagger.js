@@ -410,3 +410,131 @@ function guessString(format) {
 }
 
 
+
+/**
+ * Анализ использования DTO в OpenAPI спецификации
+ * Возвращает информацию о том, в каких запросах и ответах используются схемы
+ */
+export function analyzeDtoUsage(openapiFilePath) {
+  const doc = loadOpenApi(openapiFilePath);
+  // Поддержка как Swagger 2.0 (definitions), так и OpenAPI 3.0 (components.schemas)
+  const schemas = doc.definitions || doc.components?.schemas || {};
+  const usageMap = {};
+  
+  // Инициализируем карту использования
+  for (const schemaName of Object.keys(schemas)) {
+    usageMap[schemaName] = {
+      inRequests: [],
+      inResponses: [],
+      schema: schemas[schemaName]
+    };
+  }
+  
+  // Анализируем пути
+  for (const [path, methods] of Object.entries(doc.paths || {})) {
+    for (const [method, operation] of Object.entries(methods || {})) {
+      // Проверяем requestBody (OpenAPI 3.0) или parameters (Swagger 2.0)
+      if (operation.requestBody?.content) {
+        // OpenAPI 3.0 format
+        const schemaRef = operation.requestBody.content['application/json']?.schema?.$ref;
+        if (schemaRef) {
+          const dtoName = schemaRef.split('/').pop();
+          if (usageMap[dtoName]) {
+            usageMap[dtoName].inRequests.push({ path, method });
+          }
+        }
+      } else if (operation.parameters) {
+        // Swagger 2.0 format - ищем body параметры
+        const bodyParam = operation.parameters.find(p => p.in === 'body' && p.schema?.$ref);
+        if (bodyParam) {
+          const dtoName = bodyParam.schema.$ref.split('/').pop();
+          if (usageMap[dtoName]) {
+            usageMap[dtoName].inRequests.push({ path, method });
+          }
+        }
+      }
+      
+      // Проверяем responses
+      for (const [statusCode, response] of Object.entries(operation.responses || {})) {
+        let schemaRef = null;
+        if (response.content) {
+          // OpenAPI 3.0 format
+          schemaRef = response.content['application/json']?.schema?.$ref;
+        } else if (response.schema?.$ref) {
+          // Swagger 2.0 format
+          schemaRef = response.schema.$ref;
+        }
+        
+        if (schemaRef) {
+          const dtoName = schemaRef.split('/').pop();
+          if (usageMap[dtoName]) {
+            usageMap[dtoName].inResponses.push({ path, method, status: statusCode });
+          }
+        }
+      }
+    }
+  }
+  
+  // Преобразуем в массив для удобства отображения
+  const dtoList = Object.entries(usageMap).map(([name, data]) => ({
+    name,
+    inRequests: data.inRequests,
+    inResponses: data.inResponses,
+    totalUsage: data.inRequests.length + data.inResponses.length,
+    schema: data.schema
+  }));
+  
+  // Собираем информацию об эндпоинтах с DTO
+  const endpointsWithDto = [];
+  for (const [path, methods] of Object.entries(doc.paths || {})) {
+    for (const [method, operation] of Object.entries(methods || {})) {
+      const endpointInfo = {
+        path,
+        method,
+        requestBody: null,
+        responses: []
+      };
+      
+      // Request body DTO
+      if (operation.requestBody?.content) {
+        // OpenAPI 3.0 format
+        const schemaRef = operation.requestBody.content['application/json']?.schema?.$ref;
+        if (schemaRef) {
+          endpointInfo.requestBody = schemaRef.split('/').pop();
+        }
+      } else if (operation.parameters) {
+        // Swagger 2.0 format
+        const bodyParam = operation.parameters.find(p => p.in === 'body' && p.schema?.$ref);
+        if (bodyParam) {
+          endpointInfo.requestBody = bodyParam.schema.$ref.split('/').pop();
+        }
+      }
+      
+      // Response DTOs
+      for (const [statusCode, response] of Object.entries(operation.responses || {})) {
+        let schemaRef = null;
+        if (response.content) {
+          // OpenAPI 3.0 format
+          schemaRef = response.content['application/json']?.schema?.$ref;
+        } else if (response.schema?.$ref) {
+          // Swagger 2.0 format
+          schemaRef = response.schema.$ref;
+        }
+        
+        if (schemaRef) {
+          endpointInfo.responses.push({
+            status: statusCode,
+            schema: schemaRef.split('/').pop()
+          });
+        }
+      }
+      
+      endpointsWithDto.push(endpointInfo);
+    }
+  }
+  
+  return {
+    dtos: dtoList,
+    endpoints: endpointsWithDto
+  };
+}
