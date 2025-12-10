@@ -1,0 +1,43 @@
+{
+  "name": "har-wiremock",
+  "version": "1.0.0",
+  "description": "Convert HAR files from Chrome to WireMock stub mappings",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js",
+    "convert": "node index.js",
+    "server": "node server.js",
+    "dev": "node server.js",
+    "frontend": "cd frontend && npm run dev",
+    "frontend:build": "cd frontend && npm run build",
+    "dev:full": "concurrently \"npm run dev\" \"npm run frontend\""
+  },
+  "keywords": [
+    "har",
+    "wiremock",
+    "mocking",
+    "http"
+  ],
+  "author": "",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/karambaJob/har-wiremock.git"
+  },
+  "bugs": {
+    "url": "https://github.com/karambaJob/har-wiremock/issues"
+  },
+  "homepage": "https://github.com/karambaJob/har-wiremock#readme",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^5.1.0",
+    "form-data": "^4.0.5",
+    "multer": "^2.0.2",
+    "node-fetch": "^3.3.2",
+    "yaml": "^2.6.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
+  }
+}

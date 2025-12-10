@@ -1,0 +1,9 @@
+node_modules/
+wiremock-mappings/
+*.har
+.DS_Store
+*.log
+har/
+uploads/
+frontend/node_modules/
+frontend/dist/
